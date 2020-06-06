@@ -1,0 +1,8 @@
+---
+- name: test connection
+  win_ping:
+    
+- name: DHCP
+  win_feature:
+    name: DHCP
+    state: present

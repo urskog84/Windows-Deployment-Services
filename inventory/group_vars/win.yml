@@ -1,0 +1,9 @@
+---
+ansible_connection: winrm 
+#ansible_host: 127.0.0.1
+ansible_port: 5985
+ansible_user: 'vagrant'
+ansible_password: 'vagrant'
+ansible_winrm_scheme: http
+ansible_winrm_transport: basic
+ansible_winrm_server_cert_validation: ignore

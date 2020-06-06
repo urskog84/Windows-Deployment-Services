@@ -1,0 +1,49 @@
+---
+- name: test connection
+  win_ping:
+
+- name: Windows Deployment Services 
+  win_feature:
+    name: WDS
+    state: present
+
+- name: Setup WDS.
+  win_shell: |
+    wdsutil /initialize-server /remInst:"C:\RemoteInstall"  /standalone  | select -last 1
+  args:
+    creates: C:\RemoteInstall
+  register: wds_setup
+
+- name: Create folders c:\sources
+  win_file:
+    path: C:\sources
+    state: directory
+
+#- name: Download Win 10 LTSC EVAL
+#  win_get_url:
+#    url: https://software-download.microsoft.com/download/sg/17763.107.101029-1455.rs5_release_svc_refresh_CLIENT_LTSC_EVAL_x64FRE_en-us.iso
+#    dest: C:\sources
+#    checksum: b254ba13c50d777e4776a98684e11e11
+#    checksum_algorithm: md5
+#
+#    Mount-DiskImage -ImagePath "E:\ISO-Files\My US Visit Fall 2010 Pictures.iso"
+
+- name: WdsBootImage
+  win_shell:  |
+    Import-WdsBootImage -Path "D:\sources\boot.wim"
+  args:
+    creates: C:\RemoteInstall\Boot\x64\Images\boot.wim
+
+- name: Add new WDS Install ImageGroup
+  win_shell: |
+    New-WdsInstallImageGroup -Name "Desktops"
+  args:
+    creates: C:\RemoteInstall\Images\Desktops
+    
+- name: Import WDS InstallImage to ImageGroup Desktops
+  win_shell: |
+    $imageName = Get-WindowsImage -imagePath "D:\sources\install.wim" | select Imagename
+    Import-WdsInstallImage -ImageGroup "Desktops" -Path "D:\sources\install.wim" -NewImageName $imageName.imageName
+  args:
+    creates: C:\RemoteInstall\Images\Desktops\install.wim
+  
