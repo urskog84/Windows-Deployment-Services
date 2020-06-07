@@ -46,4 +46,30 @@
     Import-WdsInstallImage -ImageGroup "Desktops" -Path "D:\sources\install.wim" -NewImageName $imageName.imageName
   args:
     creates: C:\RemoteInstall\Images\Desktops\install.wim
-  
+
+- name: Check if a dhcp is installed
+  win_service:
+    name: DHCP
+  register: dhcp_info
+
+- name: Check if a wds is running
+  win_service:
+    name: WDSServer
+  register: wds_info
+
+- name: db
+  debug:
+    msg: '{{ wds_info }}'
+
+- name: No dhcp port when dhcp service
+  win_shell: |
+    wdsutil /set-Server /UseDhcpPorts:No
+  when: 
+    - dhcp_info.exists
+    - wds_info.state != 'running'
+
+- name: Ensure WDSServer is running
+  win_service:
+    name: WDSServer
+    start_mode: auto
+    state: started
