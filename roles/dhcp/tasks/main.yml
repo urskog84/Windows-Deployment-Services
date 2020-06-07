@@ -7,3 +7,12 @@
     name: DHCP
     state: present
     include_management_tools: yes
+
+- name: Config a DHCP scoop
+  win_shell: |
+    Add-DhcpServerv4Scope -Name "PXE Lab Scoop" -StartRange 192.168.22.200 -EndRange 192.168.22.240 -SubnetMask 255.255.255.0 
+    Set-DhcpServerv4Scope -ScopeId 192.168.22.0 -Name "PXE Lab Scoop" -State Active -LeaseDuration 4.00:00:00
+    Set-DhcpServerv4OptionValue -ScopeId 192.168.22.0 -OptionId 6 -Value "192.168.22.1"
+    Set-DhcpServerv4OptionValue -ScopeId 192.168.22.0 -OptionId 60 -Value "PXEClient"
+    Set-DhcpServerv4OptionValue -ScopeId 192.168.22.0 -OptionId 66 -Value "{{ ansible_host }}"
+    Set-DhcpServerv4OptionValue -ScopeId 192.168.22.0 -OptionId 67 -Value "boot\x64\pxeboot.com"

@@ -10,6 +10,7 @@
 - name: Setup WDS.
   win_shell: |
     wdsutil /initialize-server /remInst:"C:\RemoteInstall"  /standalone  | select -last 1
+    wdsutil /Set-Server /UseDhcpPorts:No /DhcpOption60:Yes /AnswerClients:All 
   args:
     creates: C:\RemoteInstall
   register: wds_setup
@@ -40,6 +41,12 @@
   args:
     creates: C:\RemoteInstall\Images\Desktops
     
+- name: Ensure WDSServer is running
+  win_service:
+    name: WDSServer
+    start_mode: auto
+    state: started
+
 - name: Import WDS InstallImage to ImageGroup Desktops
   win_shell: |
     $imageName = Get-WindowsImage -imagePath "D:\sources\install.wim" | select Imagename
@@ -47,29 +54,3 @@
   args:
     creates: C:\RemoteInstall\Images\Desktops\install.wim
 
-- name: Check if a dhcp is installed
-  win_service:
-    name: DHCP
-  register: dhcp_info
-
-- name: Check if a wds is running
-  win_service:
-    name: WDSServer
-  register: wds_info
-
-- name: db
-  debug:
-    msg: '{{ wds_info }}'
-
-- name: No dhcp port when dhcp service
-  win_shell: |
-    wdsutil /set-Server /UseDhcpPorts:No
-  when: 
-    - dhcp_info.exists
-    - wds_info.state != 'running'
-
-- name: Ensure WDSServer is running
-  win_service:
-    name: WDSServer
-    start_mode: auto
-    state: started
