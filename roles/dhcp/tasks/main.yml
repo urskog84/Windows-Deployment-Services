@@ -6,3 +6,4 @@
   win_feature:
     name: DHCP
     state: present
+    include_management_tools: yes

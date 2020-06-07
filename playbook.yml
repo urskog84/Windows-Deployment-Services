@@ -2,5 +2,6 @@
 - hosts: all
   gather_facts: no
   roles: 
-    - windows-deploymnet-service
-    - dhcp
+    - role: windows-deploymnet-service
+    - role: dhcp
+      tags: dhcp
