@@ -8,9 +8,14 @@ Vagrant.configure(2) do |config|
   config.winrm.retry_limit = 200 # from https://github.com/mitchellh/vagrant/issues/6430
   config.winrm.retry_delay = 10  # from https://github.com/mitchellh/vagrant/issues/6430
   config.vm.graceful_halt_timeout = 600
-  config.vm.provider 'hyperv' do |hyperv, override|
-    hyperv.ip_address_timeout = 600 # 10 minutes
-    hyperv.auto_start_action = 'Start'
-    hyperv.linked_clone = true
+  config.vm.network :private_network, ip: "192.168.22.30"
+  #config.vm.provider 'hyperv' do |hyperv, override|
+  #  hyperv.ip_address_timeout = 600 # 10 minutes
+  #  hyperv.auto_start_action = 'Start'
+  #  hyperv.linked_clone = true
+  #end
+  config.vm.provider 'virtualbox' do |virtualbox, override|
+    virtualbox.linked_clone = true
+    virtualbox.gui = false
   end
 end
