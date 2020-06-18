@@ -17,5 +17,7 @@ Vagrant.configure(2) do |config|
   config.vm.provider 'virtualbox' do |virtualbox, override|
     virtualbox.linked_clone = true
     virtualbox.gui = false
+    virtualbox.cpus = 4
+    virtualbox.memory = 4094
   end
 end
