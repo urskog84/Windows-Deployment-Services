@@ -1,0 +1,156 @@
+---
+# https://gal.vin/2019/11/25/installing-microsoft-deployment-toolkit-and-deploying-windows-10-from-scratch/
+# https://gal.vin/2019/10/06/deploying-a-windows-10-1909-reference-image-with-mdt/
+# https://www.youtube.com/watch?v=W4Xfen6Slrk
+# https://github.com/DeploymentResearch/DRFiles/blob/master/Scripts/FixUEFIDetection.wsf
+# https://docs.microsoft.com/en-us/mem/configmgr/mdt/toolkit-reference#mdt-windows-powershell-cmdlets
+
+- name: create dir c:\temp
+  win_file:
+    path: '{{ item }}'
+    state: directory
+  with_items:
+    - C:\Temp\
+    - C:\ISO\
+
+
+- name: Download the Windows ADK for Windows 10 version 2004
+  win_get_url:
+    url: 'https://go.microsoft.com/fwlink/?linkid=2120254'
+    dest: C:\temp\adksetup.exe
+ 
+- name: Download the Windows PE add-on for the ADK version 2004
+  win_get_url:
+    url: 'https://go.microsoft.com/fwlink/?linkid=2120253'
+    dest: C:\temp\adkwinpesetup.exe
+
+- name: Download the Microsoft Deploymnet Tollkit x64
+  win_get_url:
+    url: ' https://download.microsoft.com/download/3/3/9/339BE62D-B4B8-4956-B58D-73C4685FC492/MicrosoftDeploymentToolkit_x64.msi'
+    dest: C:\temp\MicrosoftDeploymentToolkit_x64.msi
+
+- name: Download Windows System Image Manager - 1903 update
+  win_get_url:
+    url: 'https://go.microsoft.com/fwlink/?linkid=2095334'
+    dest: c:\temp\WSIM1903.zip
+
+
+- name: Install Windows ADK
+  win_package:
+    path: C:\temp\adksetup.exe
+    product_id: '{9346016b-6620-4841-8ea4-ad91d3ea02b5}'
+    state: present
+    arguments: /features + /q
+
+- name: Install Windows PE add-on for the ADK version 2004
+  win_package:
+    path: C:\temp\adkwinpesetup.exe
+    product_id: '{57CCDF62-0F8B-8B79-34CD-F504E7228DEF}'
+    state: present
+    arguments: /features + /q
+
+
+- name: Install Microsoft Deploymnet Tollkit
+  win_package:
+    path: C:\temp\MicrosoftDeploymentToolkit_x64.msi
+    creates_path: 'C:\Program Files\Microsoft Deployment Toolkit'
+
+- name: Download Win 10 LTSC EVAL
+  win_get_url:
+    url: 'https://software-download.microsoft.com/download/sg/17763.107.101029-1455.rs5_release_svc_refresh_CLIENT_LTSC_EVAL_x64FRE_en-us.iso'
+    dest: C:\ISO\17763.107.101029-1455.rs5_release_svc_refresh_CLIENT_LTSC_EVAL_x64FRE_en-us.iso
+    #checksum: b254ba13c50d777e4776a98684e11e11
+    #checksum_algorithm: md5
+    force: no
+
+- name: Mount Win 10 LTSC EVAL ISO
+  win_shell: | 
+    $mountResult = Mount-DiskImage -ImagePath "C:\iso\17763.107.101029-1455.rs5_release_svc_refresh_CLIENT_LTSC_EVAL_x64FRE_en-us.iso"  -StorageType ISO
+    ($mountResult | Get-Volume).DriveLetter
+  register: cd_drive
+
+- debug:
+    msg: "{{ cd_drive.stdout_lines[0] }}"
+
+- name: create dir c:\temp
+  win_file:
+    path: '{{ MDT_folder_path }}'
+    state: directory
+  
+
+- name: Add secret share
+  win_share:
+    name: '{{ MDT_share_name }}'
+    description: '{{ MDT_description }}'
+    path: '{{ MDT_folder_path }}'
+    list: no
+    full: Administrators
+  
+
+- name: Create DeplaymnetShare Name DS003
+  win_shell: |
+    Add-PSSnapIn Microsoft.BDD.PSSnapIn
+    $UNCPath = "\{{ MDT_share_name }}"
+    New-PSDrive –Name "DS003" -PSProvider "MDTProvider" –Root "{{ MDT_folder_path }}" –Description "{{ MDT_description }}" –NetworkPath $UNCPath -Verbose | add-MDTPersistentDrive –Verbose
+  args:
+    creates: "{{ MDT_folder_path }}\\Scripts"
+  
+
+- name: Download Fix for UEFI Detection
+  win_get_url:
+    url: 'https://raw.githubusercontent.com/DeploymentResearch/DRFiles/master/Scripts/FixUEFIDetection.wsf'
+    dest: "{{ MDT_folder_path }}\\Scripts\\FixUEFIDetection.wsf"
+
+
+- name: Import MDT Operatingsystem
+  win_shell: |
+    Import-Module "C:\Program Files\Microsoft Deployment Toolkit\bin\MicrosoftDeploymentToolkit.psd1"
+    New-PSDrive -Name "DS003" -PSProvider MDTProvider -Root "{{ MDT_folder_path }}"
+    $SourcePath = "{{ cd_drive.stdout_lines[0] }}:"
+    import-mdtoperatingsystem -path "DS003:\Operating Systems" -SourcePath E: -DestinationFolder "Windows 10 Enterprise LTSC 2019 Evaluation x64" -Verbose
+   
+- name: Import MDT Task
+  win_shell: |
+    Import-Module "C:\Program Files\Microsoft Deployment Toolkit\bin\MicrosoftDeploymentToolkit.psd1"
+    New-PSDrive -Name "DS003" -PSProvider MDTProvider -Root "{{ MDT_folder_path }}"
+    import-mdttasksequence -path "DS003:\Task Sequences" -Name "Install Win10" -Template "Client.xml" -Comments "" -ID "WIN10-A" -Version "1.0" -OperatingSystemPath "DS003:\Operating Systems\Windows 10 Enterprise LTSC 2019 Evaluation in Windows 10 Enterprise LTSC 2019 Eva x64 install.wim" -FullName "Vagrant" -OrgName "Test" -HomePage "about:blank" -AdminPassword "vagrant" -Verbose
+  tags: mdt-task
+
+
+- name: Copy Tasks
+  win_copy:
+    src: files/mdt_tasks/
+    dest: "{{ MDT_folder_path }}\\Control\\"
+
+- name: Copy Bootstrap template
+  win_template:
+    src: files/Bootstrap.j2
+    dest: "{{ MDT_folder_path }}\\Control\\Bootstrap.ini"
+  register: bootstrap
+  tags: boot
+
+- name: Copy WIN10-A Tasks sequense
+  win_copy:
+    src: files/WIN10-A
+    dest: "{{ MDT_folder_path }}\\Control\\"
+
+
+- name: Update MDT DeploymentShare
+  win_shell: |
+    Import-Module "C:\Program Files\Microsoft Deployment Toolkit\bin\MicrosoftDeploymentToolkit.psd1"
+    New-PSDrive -Name "DS003" -PSProvider MDTProvider -Root "{{ MDT_folder_path }}"
+    update-MDTDeploymentShare -path "DS003:" -Force -Verbose
+  #args:
+  #  creates: "{{ MDT_folder_path }}\\Boot\\x64"
+  when: bootstrap.changed
+  tags: boot
+
+- name: WdsBootImage
+  win_shell:  |
+    Get-WdsBootImage | Remove-WdsBootImage
+    Import-WdsBootImage -Path "{{ MDT_folder_path }}\Boot\LiteTouchPE_x64.wim"
+  #  Import-WdsBootImage -Path "{{ MDT_folder_path }}\Boot\LiteTouchPE_x86.wim"
+  #args:
+  #  creates: C:\RemoteInstall\Boot\x64\Images\LiteTouchPE_x64.wim
+  when: bootstrap.changed
+  tags: boot

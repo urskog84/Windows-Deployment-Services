@@ -1,8 +1,13 @@
 ---
 - hosts: all
-  gather_facts: no
+  gather_facts: yes
   roles: 
   
     - role: dhcp
       tags: dhcp
     - role: windows-deploymnet-service
+      tags: wds
+    - role: mdt
+      tags: mdt
+      
+  
